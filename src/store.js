@@ -1,0 +1,1 @@
+module.exports={props:{},cache:new Map(),editQueue:[],postQueue:[],history:{},versions:{},sessions:{}};

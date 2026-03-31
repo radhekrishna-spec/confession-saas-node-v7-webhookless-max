@@ -1,0 +1,1 @@
+const svc=require('../services/confessionService'); function startEditQueueWorker(){ setInterval(()=>svc.processEditQueue(),1000);} module.exports={startEditQueueWorker};

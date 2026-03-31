@@ -1,0 +1,1 @@
+module.exports={ post: async(id,cap,imgs)=>console.log('IG',id,cap,imgs) };

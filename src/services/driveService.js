@@ -1,0 +1,1 @@
+module.exports={ upload: async(files)=>files.map(f=>`https://drive.fake/${f}`) };
