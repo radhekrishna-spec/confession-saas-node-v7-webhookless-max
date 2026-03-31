@@ -1,7 +1,6 @@
-require("dotenv").config();
+require('dotenv').config();
 const express = require('express');
 const { startWorkers } = require('./workers');
-
 
 const submitRoutes = require('./routes/submitRoutes');
 

@@ -1,53 +1,206 @@
+const axios = require('axios');
 const store = require('../store');
-const confession = require('./confessionService');
-const telegram = require('./telegramService');
+const { sendTelegramMessage } = require('./telegramService');
+const {
+  addToEditQueue,
+  processEditQueue,
+} = require('../workers/editQueueWorker');
 
-async function processTelegramUpdate(update) {
-  if (!update) return;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-  // message for edit preview
-  if (update.message) {
-    const editingId = store.props.editing_active;
-    const waiting = store.props.awaiting_edit_input;
+const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-    if (!editingId || !waiting) return;
+// EXACT SAME BUTTON UPDATE FLOW + SAFE
+async function confirmEdit(chatId, confessionNo, text) {
+  try {
+    addToEditQueue(confessionNo, text);
 
-    const text = (update.message.text || '').trim();
+    await sendTelegramMessage(
+      chatId,
+      `🚀 Processing edit for #${confessionNo}`,
+    );
 
-    if (!text) return;
+    await processEditQueue();
 
-    store.props[`pending_edit_${editingId}`] = text;
-    delete store.props.awaiting_edit_input;
+    await sendTelegramMessage(
+      chatId,
+      `✅ Edited confession #${confessionNo} completed`,
+    );
 
-    await telegram.sendPreviewButtons(editingId, text);
-    return;
-  }
+    store.delete('awaiting_edit_input');
+    store.delete('editing_active');
+    store.delete('editing_chat');
+    store.delete('editing_time');
+  } catch (error) {
+    console.error('CONFIRM EDIT ERROR:', error.message);
 
-  // callback buttons
-  if (update.callback_query) {
-    const action = update.callback_query.data;
-    const chatId = update.callback_query.message.chat.id;
-
-    if (action.startsWith('approve_')) {
-      return confession.approve(action.replace('approve_', ''));
-    }
-
-    if (action.startsWith('reject_')) {
-      return confession.reject(action.replace('reject_', ''));
-    }
-
-    if (action.startsWith('edit_')) {
-      return confession.startEdit(action.replace('edit_', ''));
-    }
-
-    if (action.startsWith('confirmedit_')) {
-      return confession.confirmEdit(action.replace('confirmedit_', ''));
-    }
-
-    if (action.startsWith('stopedit_')) {
-      return confession.stopEdit(action.replace('stopedit_', ''));
-    }
+    await sendTelegramMessage(chatId, `❌ Edit failed for #${confessionNo}`);
   }
 }
 
-module.exports = { processTelegramUpdate };
+async function updateTelegramButtons(chatId, messageId, status, confessionNo) {
+  if (!messageId) return;
+
+  let keyboard;
+
+  if (status === 'approved') {
+    keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: 'EDIT ✏️',
+            callback_data: `edit_${confessionNo}`,
+          },
+          {
+            text: 'REJECT ❌',
+            callback_data: `reject_${confessionNo}`,
+          },
+        ],
+        [
+          {
+            text: 'SEE MORE ⚙️',
+            callback_data: `more_${confessionNo}`,
+          },
+        ],
+      ],
+    };
+  } else if (status === 'rejected') {
+    keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: 'APPROVE ✅',
+            callback_data: `approve_${confessionNo}`,
+          },
+          {
+            text: 'EDIT ✏️',
+            callback_data: `edit_${confessionNo}`,
+          },
+        ],
+        [
+          {
+            text: 'SEE MORE ⚙️',
+            callback_data: `more_${confessionNo}`,
+          },
+        ],
+      ],
+    };
+  } else if (status === 'editing') {
+    keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: 'STOP EDITING ❌',
+            callback_data: `stopedit_${confessionNo}`,
+          },
+        ],
+      ],
+    };
+  } else {
+    keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: 'APPROVE ✅',
+            callback_data: `approve_${confessionNo}`,
+          },
+          {
+            text: 'REJECT ❌',
+            callback_data: `reject_${confessionNo}`,
+          },
+          {
+            text: 'SEE MORE ⚙️',
+            callback_data: `more_${confessionNo}`,
+          },
+        ],
+      ],
+    };
+  }
+
+  try {
+    await axios.post(
+      `${BASE_URL}/editMessageReplyMarkup`,
+      {
+        chat_id: chatId,
+        message_id: Number(messageId),
+        reply_markup: keyboard,
+      },
+      {
+        timeout: 10000,
+      },
+    );
+  } catch (error) {
+    console.error(
+      'BUTTON UPDATE ERROR:',
+      error.response?.data || error.message,
+    );
+  }
+}
+
+// EXACT SAME APPROVE FLOW + DUP SAFE
+async function approveConfession(chatId, messageId, confessionNo) {
+  if (store.get(`state_${confessionNo}`) === 'APPROVED') {
+    await sendTelegramMessage(chatId, '⚠️ Already approved');
+    return;
+  }
+
+  store.set(`status_${confessionNo}`, 'approved');
+  store.set(`state_${confessionNo}`, 'APPROVED');
+  store.set(`approved_time_${confessionNo}`, Date.now());
+
+  const tgMsgId = store.get(`telegram_msg_${confessionNo}`);
+
+  await updateTelegramButtons(CHAT_ID, tgMsgId, 'approved', confessionNo);
+
+  await sendTelegramMessage(chatId, `✅ Confession #${confessionNo} approved`);
+}
+
+// EXACT SAME REJECT FLOW + SAFE
+async function rejectConfession(chatId, messageId, confessionNo) {
+  if (store.get(`state_${confessionNo}`) === 'REJECTED') {
+    await sendTelegramMessage(chatId, '⚠️ Already rejected');
+    return;
+  }
+
+  store.set(`status_${confessionNo}`, 'rejected');
+  store.set(`state_${confessionNo}`, 'REJECTED');
+  store.set(`rejected_time_${confessionNo}`, Date.now());
+
+  await updateTelegramButtons(chatId, messageId, 'rejected', confessionNo);
+
+  await sendTelegramMessage(chatId, `❌ Confession #${confessionNo} rejected`);
+}
+
+// EXACT SAME EDIT START FLOW + TIMEOUT
+async function startEditMode(chatId, messageId, confessionNo) {
+  const oldText = store.get(`text_${confessionNo}`);
+
+  if (!oldText) {
+    await sendTelegramMessage(
+      chatId,
+      `❌ Original text not found for #${confessionNo}`,
+    );
+    return;
+  }
+
+  store.set('editing_active', confessionNo);
+  store.set('editing_chat', chatId);
+  store.set('editing_time', Date.now());
+  store.set('awaiting_edit_input', '1');
+
+  await updateTelegramButtons(chatId, messageId, 'editing', confessionNo);
+
+  await sendTelegramMessage(
+    chatId,
+    `✏️ Editing #${confessionNo}\n\n📌 Current text:\n${oldText}\n\nSend new edited text now.`,
+  );
+}
+
+module.exports = {
+  approveConfession,
+  rejectConfession,
+  startEditMode,
+  updateTelegramButtons,
+  confirmEdit,
+};

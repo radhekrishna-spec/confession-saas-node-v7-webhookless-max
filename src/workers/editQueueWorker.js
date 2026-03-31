@@ -1,42 +1,78 @@
 const store = require('../store');
-const { generateSlidesImages } = require('../services/slidesService');
-const { uploadImagesToDrive } = require('../services/driveService');
-const { sendTelegram } = require('../services/telegramService');
-const { buildCaption } = require('../services/captionService');
+const { processFormSubmit } = require('../services/formSubmitService');
+const { sendTelegramMessage } = require('../services/telegramService');
 
+// EXACT SAME QUEUE ADD
+function addToEditQueue(confessionNo, text) {
+  let queue = store.get('EDIT_QUEUE') || [];
+
+  // remove old same id
+  queue = queue.filter((q) => q.id != confessionNo);
+
+  queue.push({
+    id: confessionNo,
+    text,
+    time: Date.now(),
+  });
+
+  store.set('EDIT_QUEUE', queue);
+}
+
+// EXACT SAME HISTORY SAVE
+function saveEditHistory(confessionNo, text) {
+  let history = store.get(`edit_history_${confessionNo}`) || [];
+
+  history.unshift({
+    text,
+    time: new Date().toLocaleString(),
+  });
+
+  history = history.slice(0, 5);
+
+  store.set(`edit_history_${confessionNo}`, history);
+}
+
+// EXACT SAME PROCESS FLOW
 async function processEditQueue() {
-  const editingId = store.props.editing_active;
+  const queue = store.get('EDIT_QUEUE') || [];
 
-  if (!editingId) return;
+  if (!queue.length) return;
 
-  const text = store.props[`text_${editingId}`];
+  const job = queue[0];
 
-  if (!text) return;
+  store.set('EDIT_WORKING_TIME', Date.now());
 
   try {
-    const parts = [text];
+    // overwrite old text
+    store.set(`text_${job.id}`, job.text);
 
-    const imageBuffers = await generateSlidesImages(parts, editingId);
+    saveEditHistory(job.id, job.text);
 
-    const driveUrls = await uploadImagesToDrive(imageBuffers, editingId);
+    // regenerate exact same flow
+    await processFormSubmit({
+      confession: job.text,
+    });
 
-    const caption = buildCaption(text, editingId);
+    // remove processed job
+    queue.shift();
 
-    await sendTelegram(driveUrls, caption, editingId);
+    store.set('EDIT_QUEUE', queue);
 
-    console.log(`Edit processed #${editingId}`);
-  } catch (err) {
-    console.log('edit queue error', err.message);
+    store.delete('EDIT_WORKING');
+  } catch (error) {
+    console.error('EDIT FAILED', error.message);
   }
 }
 
+// EXACT SAME AUTO WORKER
 function startEditQueueWorker() {
-  setInterval(async () => {
-    await processEditQueue();
-  }, 3000);
+  console.log('Edit queue worker started...');
+
+  setInterval(processEditQueue, 3000);
 }
 
 module.exports = {
-  startEditQueueWorker,
+  addToEditQueue,
   processEditQueue,
+  startEditQueueWorker,
 };

@@ -1,18 +1,155 @@
 const axios = require('axios');
+const store = require('../store');
 
-async function sendTelegram(images, caption, confessionNo) {
-  
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-  console.log('FINAL URL:', url);
-
-  await axios.post(url, {
-    chat_id: chatId,
-    text: `Test confession #${confessionNo}\n${caption}`,
-  });
+// reusable safe delay
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { sendTelegram };
+// EXACT SAME AS APPSCRIPT + UPGRADED
+async function sendTelegram(images, caption, confessionNo) {
+  // HARD SEND LOCK SAME
+  if (store.get(`telegram_sending_${confessionNo}`)) {
+    console.log(`⚠️ Telegram already sending #${confessionNo}`);
+    return;
+  }
+
+  store.set(`telegram_sending_${confessionNo}`, '1');
+
+  try {
+    // duplicate protection
+    if (store.get(`telegram_sent_${confessionNo}`)) {
+      console.log(`⚠️ Already sent #${confessionNo}`);
+      return;
+    }
+
+    if (!images || !images.length) {
+      throw new Error('No images provided for Telegram');
+    }
+
+    const chunkSize = 10;
+    const sentMessageIds = [];
+
+    // EXACT MEDIA GROUP FLOW SAME
+    for (let i = 0; i < images.length; i += chunkSize) {
+      const chunk = images.slice(i, i + chunkSize);
+
+      const media = chunk.map((img, idx) => ({
+        type: 'photo',
+        media: img,
+        caption: i === 0 && idx === 0 ? caption : undefined,
+      }));
+
+      const mediaRes = await axios.post(
+        `${BASE_URL}/sendMediaGroup`,
+        {
+          chat_id: CHAT_ID,
+          media,
+        },
+        {
+          timeout: 20000,
+        },
+      );
+
+      const results = mediaRes.data?.result || [];
+
+      results.forEach((msg) => {
+        if (msg?.message_id) {
+          sentMessageIds.push(msg.message_id);
+        }
+      });
+
+      // SAME SAFE DELAY
+      await sleep(1200);
+    }
+
+    // EXACT BUTTON FLOW SAME
+    const res = await axios.post(
+      `${BASE_URL}/sendMessage`,
+      {
+        chat_id: CHAT_ID,
+        text: `Confession #${confessionNo} Approval`,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: 'APPROVE ✅',
+                callback_data: `approve_${confessionNo}`,
+              },
+              {
+                text: 'REJECT ❌',
+                callback_data: `reject_${confessionNo}`,
+              },
+              {
+                text: 'SEE MORE ⚙️',
+                callback_data: `more_${confessionNo}`,
+              },
+            ],
+          ],
+        },
+      },
+      {
+        timeout: 15000,
+      },
+    );
+
+    const messageId = res.data?.result?.message_id;
+
+    // EXACT PROPERTY SAVE SAME
+    store.set(`telegram_msg_${confessionNo}`, messageId);
+    store.set(`telegram_media_msgs_${confessionNo}`, sentMessageIds);
+
+    store.set(`state_${confessionNo}`, 'TELEGRAM_SENT');
+    store.set(`telegram_sent_${confessionNo}`, 'yes');
+    store.set(`telegram_sent_time_${confessionNo}`, new Date().toISOString());
+
+    console.log(`✅ Telegram sent for #${confessionNo}`);
+
+    return res.data;
+  } catch (error) {
+    console.error(
+      'TG SEND FAIL',
+      confessionNo,
+      error.response?.data || error.message,
+    );
+
+    // retry marker
+    store.set(`telegram_failed_${confessionNo}`, {
+      time: Date.now(),
+      error: error.message,
+    });
+
+    throw error;
+  } finally {
+    store.delete(`telegram_sending_${confessionNo}`);
+  }
+}
+
+// SAME SIMPLE TEXT MESSAGE
+async function sendTelegramMessage(chatId, text) {
+  try {
+    return await axios.post(
+      `${BASE_URL}/sendMessage`,
+      {
+        chat_id: chatId,
+        text,
+      },
+      {
+        timeout: 10000,
+      },
+    );
+  } catch (error) {
+    console.error('TG TEXT SEND FAIL:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+module.exports = {
+  sendTelegram,
+  sendTelegramMessage,
+};

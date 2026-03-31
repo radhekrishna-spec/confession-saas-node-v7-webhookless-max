@@ -1,8 +1,14 @@
-let confessionNo = 0;
+const store = require('../store');
 
+// EXACT APP SCRIPT SAME
 async function getNextConfessionNo() {
-  confessionNo += 1;
-  return confessionNo;
+  let num = Number(store.get('CONFESSION_NO') || 0) + 1;
+
+  store.set('CONFESSION_NO', num);
+
+  return num;
 }
 
-module.exports = { getNextConfessionNo };
+module.exports = {
+  getNextConfessionNo,
+};

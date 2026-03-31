@@ -1,21 +1,45 @@
+require('dotenv').config();
 const { google } = require('googleapis');
-const credentials = require('./oauth-client.json');
+const readline = require('readline');
 
-const { client_id, client_secret, redirect_uris } =
-  credentials.installed || credentials.web;
-
-const oAuth2Client = new google.auth.OAuth2(
-  client_id,
-  client_secret,
-  redirect_uris[0],
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  'http://localhost',
 );
 
-const code =
-  '4/0Aci98E9gz3BZBcVPlez2KOirvG5eAutN3iF7Lmr4Gz2ya1ZFzfXW25CLyR3nE3MadBZK3A';
+const scopes = [
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/presentations',
+];
 
-async function getToken() {
-  const { tokens } = await oAuth2Client.getToken(code);
-  console.log(tokens);
-}
+const authUrl = oauth2Client.generateAuthUrl({
+  access_type: 'offline',
+  prompt: 'consent',
+  scope: scopes,
+});
 
-getToken();
+console.log('\nOpen this URL in browser:\n');
+console.log(authUrl);
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+rl.question('\nPaste NEW code here: ', async (code) => {
+  try {
+    const { tokens } = await oauth2Client.getToken(code.trim());
+
+    console.log('\nTOKENS:\n');
+    console.log(tokens);
+
+    console.log('\nREFRESH TOKEN:\n');
+    console.log(tokens.refresh_token);
+
+    rl.close();
+  } catch (err) {
+    console.error('TOKEN ERROR:', err.response?.data || err.message);
+    rl.close();
+  }
+});

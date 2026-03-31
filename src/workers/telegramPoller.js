@@ -1,41 +1,163 @@
-const axios = require('axios');
-const { processTelegramUpdate } = require('../services/telegramUpdateService');
+const axios = require("axios");
+const store = require("../store");
 
-let offset = 0;
+const {
+  approveConfession,
+  rejectConfession,
+  startEditMode,
+  confirmEdit,
+} = require("../services/telegramUpdateService");
+
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+let lastUpdateId = 0;
 let isPolling = false;
+const processedCallbacks = new Map();
 
-function startTelegramPoller() {
-  setInterval(async () => {
-    if (isPolling) return;
+// cleanup old callback ids
+function cleanupProcessedCallbacks() {
+  const now = Date.now();
 
-    isPolling = true;
-
-    try {
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-
-      const res = await axios.get(
-        `https://api.telegram.org/bot${token}/getUpdates`,
-        {
-          params: {
-            offset: offset + 1,
-            timeout: 10,
-          },
-          timeout: 15000,
-        },
-      );
-
-      const updates = res.data.result || [];
-
-      for (const update of updates) {
-        offset = update.update_id;
-        await processTelegramUpdate(update);
-      }
-    } catch (error) {
-      console.log('telegram poll error', error.message);
-    } finally {
-      isPolling = false;
+  for (const [id, time] of processedCallbacks.entries()) {
+    if (now - time > 5 * 60 * 1000) {
+      processedCallbacks.delete(id);
     }
-  }, 12000);
+  }
 }
 
-module.exports = { startTelegramPoller };
+async function answerCallback(cbId, text = "Done ✅") {
+  try {
+    await axios.post(
+      `${BASE_URL}/answerCallbackQuery`,
+      {
+        callback_query_id: cbId,
+        text,
+        show_alert: false,
+      },
+      {
+        timeout: 10000,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "CALLBACK ANSWER ERROR:",
+      error.response?.data || error.message
+    );
+  }
+}
+
+async function pollTelegramUpdates() {
+  if (isPolling) return;
+
+  isPolling = true;
+
+  try {
+    cleanupProcessedCallbacks();
+
+    const res = await axios.get(`${BASE_URL}/getUpdates`, {
+      params: {
+        offset: lastUpdateId + 1,
+        timeout: 20,
+      },
+      timeout: 30000,
+    });
+
+    const updates = res.data?.result || [];
+
+    for (const update of updates) {
+      lastUpdateId = update.update_id;
+
+      // ===============================
+      // HANDLE NORMAL TEXT FOR EDIT FLOW
+      // ===============================
+      if (update.message?.text) {
+        const text = update.message.text.trim();
+        const chatId = update.message.chat.id;
+
+        const activeEditId = store.get("editing_active");
+        const awaitingEdit = store.get("awaiting_edit_input");
+        const editingChat = store.get("editing_chat");
+
+        if (
+          awaitingEdit === "1" &&
+          activeEditId &&
+          String(editingChat) === String(chatId)
+        ) {
+          console.log(`✏️ Edit text received for #${activeEditId}`);
+
+          await confirmEdit(chatId, activeEditId, text);
+
+          continue;
+        }
+      }
+
+      // only callback after text check
+      if (!update.callback_query) continue;
+
+      const cb = update.callback_query;
+      const cbId = cb.id;
+
+      // duplicate callback protection
+      if (processedCallbacks.has(cbId)) {
+        continue;
+      }
+
+      processedCallbacks.set(cbId, Date.now());
+
+      const data = cb.data;
+      const chatId = cb.message?.chat?.id;
+      const messageId = cb.message?.message_id;
+
+      try {
+        if (data.startsWith("approve_")) {
+          const id = data.replace("approve_", "");
+
+          await approveConfession(chatId, messageId, id);
+
+          await answerCallback(cbId, "Approved ✅");
+        } else if (data.startsWith("reject_")) {
+          const id = data.replace("reject_", "");
+
+          await rejectConfession(chatId, messageId, id);
+
+          await answerCallback(cbId, "Rejected ❌");
+        } else if (data.startsWith("edit_")) {
+          const id = data.replace("edit_", "");
+
+          await startEditMode(chatId, messageId, id);
+
+          await answerCallback(cbId, "Edit mode ✏️");
+        } else if (data.startsWith("more_")) {
+          await answerCallback(cbId, "More options ⚙️");
+        }
+      } catch (callbackError) {
+        console.error(
+          "CALLBACK PROCESS ERROR:",
+          callbackError.message
+        );
+
+        await answerCallback(cbId, "Failed ❌");
+      }
+    }
+  } catch (error) {
+    console.error(
+      "POLL ERROR:",
+      error.response?.data || error.message
+    );
+  } finally {
+    isPolling = false;
+  }
+}
+
+function startTelegramPoller() {
+  console.log("Telegram poller started...");
+
+  pollTelegramUpdates();
+
+  setInterval(pollTelegramUpdates, 3000);
+}
+
+module.exports = {
+  startTelegramPoller,
+};

@@ -1,66 +1,68 @@
 const { google } = require('googleapis');
-const path = require('path');
-const stream = require('stream');
+const { Readable } = require('stream');
+const store = require('../store');
 
-const credentials = require('../../oauth-client.json');
+const ROOT_FOLDER_ID = process.env.ROOT_FOLDER_ID;
 
-const { client_id, client_secret, redirect_uris } =
-  credentials.installed || credentials.web;
+function getDriveClient() {
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+  );
 
-const oAuth2Client = new google.auth.OAuth2(
-  client_id,
-  client_secret,
-  redirect_uris[0],
-);
-
-
-
-oAuth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
-
-async function uploadImagesToDrive(buffers, confessionNo) {
-  const drive = google.drive({
-    version: 'v3',
-    auth: oAuth2Client,
+  auth.setCredentials({
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
   });
 
-  const urls = [];
+  return google.drive({
+    version: 'v3',
+    auth,
+  });
+}
 
-  for (let i = 0; i < buffers.length; i++) {
-    const buffer = buffers[i];
+function getDriveDirectImageUrl(fileId) {
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
+}
 
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(buffer);
+async function uploadImagesToDrive(imageBuffers, confessionNo) {
+  const drive = getDriveClient();
+
+  let storedImages = [];
+  let ids = store.get(`fileIds_${confessionNo}`) || [];
+
+  for (let index = 0; index < imageBuffers.length; index++) {
+    const imgName =
+      imageBuffers.length === 1
+        ? `c_${confessionNo}.png`
+        : `c_${confessionNo}_part${index + 1}.png`;
+
+    const stream = Readable.from(imageBuffers[index]);
 
     const res = await drive.files.create({
       requestBody: {
-        name: `c_${confessionNo}_${i + 1}.png`,
-        parents: [process.env.ROOT_FOLDER_ID],
+        name: imgName,
+        parents: [ROOT_FOLDER_ID],
       },
       media: {
         mimeType: 'image/png',
-        body: bufferStream,
+        body: stream,
       },
       fields: 'id',
-      supportsAllDrives: true,
     });
 
     const fileId = res.data.id;
 
-    await drive.permissions.create({
-      fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-      supportsAllDrives: true,
-    });
+    ids.push(fileId);
 
-    urls.push(`https://drive.google.com/uc?id=${fileId}`);
+    storedImages.push(getDriveDirectImageUrl(fileId));
   }
 
-  return urls;
+  store.set(`fileIds_${confessionNo}`, ids);
+
+  return storedImages;
 }
 
-module.exports = { uploadImagesToDrive };
+module.exports = {
+  uploadImagesToDrive,
+  getDriveDirectImageUrl,
+};
