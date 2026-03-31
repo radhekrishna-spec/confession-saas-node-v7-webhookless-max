@@ -1,17 +1,94 @@
 require('dotenv').config();
+
 const express = require('express');
-const { startWorkers } = require('./workers');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const morgan = require('morgan');
+const fs = require('fs');
+const path = require('path');
 
 const submitRoutes = require('./routes/submitRoutes');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// logs folder
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const accessLogStream = fs.createWriteStream(path.join(logsDir, 'access.log'), {
+  flags: 'a',
+});
+
+// middlewares
+app.use(helmet());
+app.use(compression());
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(morgan('combined', { stream: accessLogStream }));
+app.use(morgan('dev'));
+
+// routes
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'UP',
+    port: PORT,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.use('/', submitRoutes);
 
-startWorkers();
+// error handler
+app.use((err, req, res, next) => {
+  console.error('SERVER ERROR:', err);
 
-app.listen(3000, () => {
-  console.log('server running on 3000');
+  res.status(500).json({
+    success: false,
+    error: err.message || 'Internal error',
+  });
+});
+
+// SAFE WORKER STARTUP
+function startWorkersSafely() {
+  try {
+    const { startTelegramPoller } = require('./workers/telegramPoller');
+
+    const { startSchedulerWorker } = require('./workers/schedulerWorker');
+
+    const { startRecoveryWorker } = require('./workers/recoveryWorker');
+
+    const { startEditQueueWorker } = require('./workers/editQueueWorker');
+
+    startTelegramPoller();
+    startSchedulerWorker();
+    startRecoveryWorker();
+    startEditQueueWorker();
+
+    console.log('✅ All workers started');
+  } catch (error) {
+    console.error('WORKER STARTUP ERROR:', error.message);
+  }
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on ${PORT}`);
+
+  // start workers AFTER server starts
+  startWorkersSafely();
+});
+
+// process level errors
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED:', err);
 });
