@@ -58,6 +58,16 @@ async function createSlidePNG(text, confessionNo, partNo, totalParts) {
   const slideId = pres.data.slides[0].objectId;
   const footerText = totalParts > 1 ? `Part ${partNo}/${totalParts}` : '';
 
+  console.log('TEXT LENGTH:', text.length);
+  console.log('FONT SIZE:', fontSize);
+  console.log('LINE SPACING:', lineSpacing);
+  console.log('BOX ID:', confessionBoxId);
+  console.log('STYLE REQUEST CHECK:', {
+    fontSize,
+    lineSpacing,
+    confessionBoxId,
+  });
+
   await slides.presentations.batchUpdate({
     presentationId,
     requestBody: {
@@ -128,6 +138,18 @@ async function createSlidePNG(text, confessionNo, partNo, totalParts) {
       ],
     },
   });
+  const updatedPres = await slides.presentations.get({
+    presentationId,
+  });
+
+  const updatedShape = updatedPres.data.slides[0].pageElements.find(
+    (el) => el.objectId === confessionBoxId,
+  );
+
+  console.log(
+    'APPLIED FONT:',
+    updatedShape?.shape?.text?.textElements?.[1]?.textRun?.style,
+  );
 
   const token = await oAuth2Client.getAccessToken();
 
