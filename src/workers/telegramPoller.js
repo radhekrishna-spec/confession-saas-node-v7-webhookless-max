@@ -1,12 +1,12 @@
-const axios = require("axios");
-const store = require("../store");
+const axios = require('axios');
+const store = require('../store');
 
 const {
   approveConfession,
   rejectConfession,
   startEditMode,
   confirmEdit,
-} = require("../services/telegramUpdateService");
+} = require('../services/telegramUpdateService');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -26,7 +26,7 @@ function cleanupProcessedCallbacks() {
   }
 }
 
-async function answerCallback(cbId, text = "Done ✅") {
+async function answerCallback(cbId, text = 'Done ✅') {
   try {
     await axios.post(
       `${BASE_URL}/answerCallbackQuery`,
@@ -37,12 +37,12 @@ async function answerCallback(cbId, text = "Done ✅") {
       },
       {
         timeout: 10000,
-      }
+      },
     );
   } catch (error) {
     console.error(
-      "CALLBACK ANSWER ERROR:",
-      error.response?.data || error.message
+      'CALLBACK ANSWER ERROR:',
+      error.response?.data || error.message,
     );
   }
 }
@@ -75,12 +75,12 @@ async function pollTelegramUpdates() {
         const text = update.message.text.trim();
         const chatId = update.message.chat.id;
 
-        const activeEditId = store.get("editing_active");
-        const awaitingEdit = store.get("awaiting_edit_input");
-        const editingChat = store.get("editing_chat");
+        const activeEditId = store.get('editing_active');
+        const awaitingEdit = store.get('awaiting_edit_input');
+        const editingChat = store.get('editing_chat');
 
         if (
-          awaitingEdit === "1" &&
+          awaitingEdit === '1' &&
           activeEditId &&
           String(editingChat) === String(chatId)
         ) {
@@ -110,52 +110,54 @@ async function pollTelegramUpdates() {
       const messageId = cb.message?.message_id;
 
       try {
-        if (data.startsWith("approve_")) {
-          const id = data.replace("approve_", "");
+        if (data.startsWith('approve_')) {
+          const id = data.replace('approve_', '');
 
           await approveConfession(chatId, messageId, id);
 
-          await answerCallback(cbId, "Approved ✅");
-        } else if (data.startsWith("reject_")) {
-          const id = data.replace("reject_", "");
+          await answerCallback(cbId, 'Approved ✅');
+        } else if (data.startsWith('reject_')) {
+          const id = data.replace('reject_', '');
 
           await rejectConfession(chatId, messageId, id);
 
-          await answerCallback(cbId, "Rejected ❌");
-        } else if (data.startsWith("edit_")) {
-          const id = data.replace("edit_", "");
+          await answerCallback(cbId, 'Rejected ❌');
+        } else if (data.startsWith('edit_')) {
+          const id = data.replace('edit_', '');
 
           await startEditMode(chatId, messageId, id);
 
-          await answerCallback(cbId, "Edit mode ✏️");
-        } else if (data.startsWith("more_")) {
-          await answerCallback(cbId, "More options ⚙️");
+          await answerCallback(cbId, 'Edit mode ✏️');
+        } else if (data.startsWith('more_')) {
+          await answerCallback(cbId, 'More options ⚙️');
         }
       } catch (callbackError) {
-        console.error(
-          "CALLBACK PROCESS ERROR:",
-          callbackError.message
-        );
+        console.error('CALLBACK PROCESS ERROR:', callbackError.message);
 
-        await answerCallback(cbId, "Failed ❌");
+        await answerCallback(cbId, 'Failed ❌');
       }
     }
   } catch (error) {
-    console.error(
-      "POLL ERROR:",
-      error.response?.data || error.message
-    );
+    console.error('POLL ERROR:', error.response?.data || error.message);
   } finally {
     isPolling = false;
   }
 }
 
 function startTelegramPoller() {
-  console.log("Telegram poller started...");
+  console.log('Telegram poller started...');
 
-  pollTelegramUpdates();
+  async function pollLoop() {
+    while (true) {
+      try {
+        await pollTelegramUpdates();
+      } catch (error) {
+        console.error('POLL LOOP ERROR:', error.message);
+      }
+    }
+  }
 
-  setInterval(pollTelegramUpdates, 3000);
+  pollLoop();
 }
 
 module.exports = {
