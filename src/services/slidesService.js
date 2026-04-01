@@ -56,6 +56,33 @@ async function createSlidePNG(text, confessionNo, partNo) {
             replaceText: text,
           },
         },
+        {
+          replaceAllText: {
+            containsText: {
+              text: '{{FOOTER}}',
+              matchCase: true,
+            },
+            replaceText: 'Reply zarur karna.',
+          },
+        },
+        {
+          replaceAllText: {
+            containsText: {
+              text: '{{ID_PLACEHOLDER}}',
+              matchCase: true,
+            },
+            replaceText: `Confession #${confessionNo}`,
+          },
+        },
+        {
+          replaceAllText: {
+            containsText: {
+              text: '{{WATERMARK}}',
+              matchCase: true,
+            },
+            replaceText: '@miet_k_dilwale_confession_wale',
+          },
+        },
       ],
     },
   });
