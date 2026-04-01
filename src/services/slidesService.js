@@ -15,7 +15,7 @@ oAuth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-async function createSlidePNG(text, confessionNo, partNo) {
+async function createSlidePNG(text, confessionNo, partNo, totalParts) {
   const drive = google.drive({
     version: 'v3',
     auth: oAuth2Client,

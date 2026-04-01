@@ -13,6 +13,10 @@ import {
   Palette,
 } from 'lucide-react';
 
+const API_BASE = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://confession-saas-node-v7-webhookless-max.onrender.com';
+
 const defaultControls = [
   {
     name: 'Spam Filter',
@@ -106,7 +110,7 @@ export default function BackendControlsDashboard() {
   const [controls, setControls] = useState(defaultControls);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/settings')
+    fetch(`${API_BASE}/api/settings`)
       .then((res) => res.json())
       .then((data) => {
         setControls((prev) =>
@@ -136,7 +140,7 @@ export default function BackendControlsDashboard() {
       payload[item.key] = item.enabled;
     });
 
-    await fetch('http://localhost:3000/api/settings', {
+    await fetch(`${API_BASE}/api/settings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -6,5 +6,5 @@
   "toxicity": true,
   "split": true,
   "telegram": true,
-  "instagram": false
+  "instagram": true
 }
