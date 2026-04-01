@@ -1,6 +1,6 @@
 const { createCanvas } = require('canvas');
 
-async function createSlidePNG(text, confessionNo, partNo) {
+async function createSlidePNG(text, confessionNo, partNo,totalParts) {
   const width = 1080;
   const height = 1350;
 

@@ -42,6 +42,7 @@ async function createSlidePNG(text, confessionNo, partNo) {
   });
 
   const slideId = pres.data.slides[0].objectId;
+  const footerText = totalParts > 1 ? `Part ${partNo}/${totalParts}` : '';
 
   await slides.presentations.batchUpdate({
     presentationId,
@@ -62,7 +63,7 @@ async function createSlidePNG(text, confessionNo, partNo) {
               text: '{{FOOTER}}',
               matchCase: true,
             },
-            replaceText: 'Reply zarur karna.',
+            replaceText: footerText,
           },
         },
         {
@@ -105,7 +106,12 @@ async function generateSlidesImages(parts, confessionNo) {
   const images = [];
 
   for (let i = 0; i < parts.length; i++) {
-    const buffer = await createSlidePNG(parts[i], confessionNo, i + 1);
+    const buffer = await createSlidePNG(
+      parts[i],
+      confessionNo,
+      i + 1,
+      parts.length,
+    );
     images.push(buffer);
   }
 
