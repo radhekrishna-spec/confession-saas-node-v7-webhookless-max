@@ -3,7 +3,6 @@ const { splitTextSmart } = require('./splitText');
 const { getNextConfessionNo } = require('./confessionCounter');
 const { generateSlidesImages } = require('./slidesService');
 const { getSettings } = require('./settingsService');
-
 const { uploadImagesToDrive } = require('./driveService');
 const { sendTelegram } = require('./telegramService');
 const {
@@ -15,7 +14,8 @@ const {
 } = require('./captionService');
 
 const store = require('../store');
-async function processFormSubmit(data) {
+
+async function processFormSubmit(data, existingConfessionNo = null) {
   const startTime = Date.now();
 
   try {
@@ -24,24 +24,20 @@ async function processFormSubmit(data) {
     const settings = {
       duplicateCheck:
         rawSettings.duplicateCheck ?? rawSettings.isDuplicate ?? true,
-
       autoSplitParts: rawSettings.autoSplitParts ?? rawSettings.split ?? true,
-
       telegramPreview:
         rawSettings.telegramPreview ?? rawSettings.telegram ?? true,
     };
 
     let raw = data?.confession || '';
-
-    // EXACT APP SCRIPT CLEAN FLOW
     let text = cleanText(raw);
 
     if (!text || !/[a-zA-Z]/.test(text)) {
       throw new Error('Invalid confession text');
     }
 
-    // duplicate text block (30 sec)
-    if (settings.duplicateCheck) {
+    // duplicate check only for new submit
+    if (!existingConfessionNo && settings.duplicateCheck) {
       const lastText = store.get('LAST_PROCESSED_TEXT');
       const lastTime = store.get('LAST_PROCESSED_TIME');
 
@@ -53,33 +49,19 @@ async function processFormSubmit(data) {
       store.set('LAST_PROCESSED_TIME', Date.now());
     }
 
-    // SAME AS APP SCRIPT
-    const confessionNo = await getNextConfessionNo();
+    const confessionNo = existingConfessionNo || (await getNextConfessionNo());
 
     console.log(`🚀 STARTING CONFESSION #${confessionNo}`);
 
-    // split exact
     const parts = settings.autoSplitParts ? splitTextSmart(text, 665) : [text];
 
-    // image generation exact
     const imageBuffers = await generateSlidesImages(parts, confessionNo);
 
-    if (!imageBuffers || !imageBuffers.length) {
-      throw new Error('Image generation failed');
-    }
-
-    // drive upload same
     const driveUrls = await uploadImagesToDrive(imageBuffers, confessionNo);
 
-    if (!driveUrls || !driveUrls.length) {
-      throw new Error('Drive upload failed');
-    }
-
-    // SAVE SAME AS PROPERTIES
     store.set(`images_${confessionNo}`, driveUrls);
     store.set(`text_${confessionNo}`, text);
 
-    // EXACT APP SCRIPT CAPTION FLOW
     let aiQuestion = store.get(`aiq_${confessionNo}`);
 
     if (!aiQuestion) {
@@ -87,7 +69,6 @@ async function processFormSubmit(data) {
         aiQuestion =
           (await generateAIQuestion(text)) || generateFallbackQuestion(text);
       } catch (error) {
-        console.error('AI QUESTION FAILED:', error.message);
         aiQuestion = generateFallbackQuestion(text);
       }
 
@@ -97,20 +78,18 @@ async function processFormSubmit(data) {
     aiQuestion = addEmotionEmoji(aiQuestion);
 
     const hashtags = getSmartHashtags(text);
-
     const caption = buildCaption(aiQuestion, confessionNo, hashtags);
 
     store.set(`caption_${confessionNo}`, caption);
-
-    // EXACT STATE SAME
     store.set(`state_${confessionNo}`, 'CREATED');
 
-    // processing time
-    store.set(`processing_time_${confessionNo}`, Date.now() - startTime);
-
-    // EXACT TELEGRAM FLOW
     if (settings.telegramPreview) {
-      await sendTelegram(driveUrls, caption, confessionNo);
+      await sendTelegram(
+        driveUrls,
+        caption,
+        confessionNo,
+        !!existingConfessionNo,
+      );
     }
 
     console.log(
@@ -123,11 +102,9 @@ async function processFormSubmit(data) {
       text,
       images: driveUrls,
       caption,
-      processingTime: Date.now() - startTime,
     };
   } catch (error) {
     console.error('FORM SUBMIT ERROR:', error.message);
-
     throw error;
   }
 }

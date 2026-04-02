@@ -40,7 +40,6 @@ async function processEditQueue() {
   if (store.get('EDIT_WORKING')) return;
 
   const queue = store.get('EDIT_QUEUE') || [];
-
   if (!queue.length) return;
 
   store.set('EDIT_WORKING', '1');
@@ -54,14 +53,38 @@ async function processEditQueue() {
 
     await regenerateEditedConfession(job.id, job.text);
 
+    const tgMsgId = store.get(`telegram_msg_${job.id}`);
+
+    // import whole module object
+    const telegramUpdateService = require('../services/telegramUpdateService');
+
+    // safe check
+    if (
+      !telegramUpdateService ||
+      typeof telegramUpdateService.updateTelegramButtons !== 'function'
+    ) {
+      throw new Error('updateTelegramButtons import failed');
+    }
+
+    await telegramUpdateService.updateTelegramButtons(
+      process.env.TELEGRAM_CHAT_ID,
+      tgMsgId,
+      'approved',
+      job.id,
+    );
+
     queue.shift();
     store.set('EDIT_QUEUE', queue);
 
     store.delete('EDIT_WORKING');
   } catch (error) {
+    queue.shift();
+    store.set('EDIT_QUEUE', queue);
+
     store.delete('EDIT_WORKING');
 
-    console.error('EDIT FAILED', error.message);
+    console.error('EDIT FAILED:', error.message);
+    console.error(error.stack);
   }
 }
 // EXACT SAME AUTO WORKER

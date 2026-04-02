@@ -21,7 +21,7 @@ function getDriveClient() {
 }
 
 function getDriveDirectImageUrl(fileId) {
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  return `https://drive.google.com/uc?export=view&id=${fileId}`;
 }
 
 async function uploadImagesToDrive(imageBuffers, confessionNo) {

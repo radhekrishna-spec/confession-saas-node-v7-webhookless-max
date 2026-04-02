@@ -1,33 +1,56 @@
 const axios = require('axios');
 const store = require('../store');
 const { sendTelegramMessage } = require('./telegramService');
-const {
-  addToEditQueue,
-  processEditQueue,
-} = require('../workers/editQueueWorker');
-
+const { addToEditQueue } = require('../workers/editQueueWorker');
+const { processFormSubmit } = require('./formSubmitService');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // EXACT SAME BUTTON UPDATE FLOW + SAFE
+
+const { splitTextSmart } = require('./splitText');
+const { generateSlidesImages } = require('./slidesService');
+const { uploadImagesToDrive } = require('./driveService');
+
 async function confirmEdit(chatId, confessionNo, text) {
   try {
-    addToEditQueue(confessionNo, text);
-
     await sendTelegramMessage(
       chatId,
-      `🚀 Processing edit for #${confessionNo}`,
+      `🛠 Creating preview for #${confessionNo}...`,
     );
 
-    // await processEditQueue();
+    store.set(`pending_edit_text_${confessionNo}`, text);
 
-    
+    const parts = splitTextSmart(text, 665);
 
-    const tgMsgId = store.get(`telegram_msg_${confessionNo}`);
+    const imageBuffers = await generateSlidesImages(parts, confessionNo);
 
-    await updateTelegramButtons(chatId, tgMsgId, 'approved', confessionNo);
+    const driveUrls = await uploadImagesToDrive(imageBuffers, confessionNo);
+
+    store.set(`preview_images_${confessionNo}`, driveUrls);
+
+    // send preview image only
+    await axios.post(`${BASE_URL}/sendPhoto`, {
+      chat_id: chatId,
+      photo: driveUrls[0],
+      caption: `👀 Preview for #${confessionNo}`,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'CONFIRM ✅',
+              callback_data: `confirmpreview_${confessionNo}`,
+            },
+            {
+              text: 'RE-EDIT ✏️',
+              callback_data: `reedit_${confessionNo}`,
+            },
+          ],
+        ],
+      },
+    });
 
     store.delete('awaiting_edit_input');
     store.delete('editing_active');
@@ -35,11 +58,8 @@ async function confirmEdit(chatId, confessionNo, text) {
     store.delete('editing_time');
   } catch (error) {
     console.error('CONFIRM EDIT ERROR:', error.message);
-
-    await sendTelegramMessage(chatId, `❌ Edit failed for #${confessionNo}`);
   }
 }
-
 async function updateTelegramButtons(chatId, messageId, status, confessionNo) {
   if (!messageId) return;
 
@@ -132,10 +152,14 @@ async function updateTelegramButtons(chatId, messageId, status, confessionNo) {
       },
     );
   } catch (error) {
-    console.error(
-      'BUTTON UPDATE ERROR:',
-      error.response?.data || error.message,
-    );
+    const err = error.response?.data;
+
+    if (err?.description?.includes('message is not modified')) {
+      console.log('⚠️ Same buttons already applied');
+      return;
+    }
+
+    console.error('BUTTON UPDATE ERROR:', err || error.message);
   }
 }
 

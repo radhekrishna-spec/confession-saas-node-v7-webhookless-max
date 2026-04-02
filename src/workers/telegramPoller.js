@@ -6,7 +6,10 @@ const {
   rejectConfession,
   startEditMode,
   confirmEdit,
+  updateTelegramButtons,
 } = require('../services/telegramUpdateService');
+
+const { processFormSubmit } = require('../services/formSubmitService');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -126,9 +129,29 @@ async function pollTelegramUpdates() {
 
           const tgMsgId = store.get(`telegram_msg_${id}`);
 
-          await updateTelegramButtons(chatId, tgMsgId, 'approved', id);
+          await updateTelegramButtons(chatId, tgMsgId, 'default', id);
 
           await answerCallback(cbId, 'Editing stopped ❌');
+        } else if (data.startsWith('reedit_')) {
+          const id = data.replace('reedit_', '');
+
+          store.set('editing_active', id);
+          store.set('editing_chat', chatId);
+          store.set('awaiting_edit_input', '1');
+
+          await answerCallback(cbId, 'Edit again ✏️');
+        } else if (data.startsWith('confirmpreview_')) {
+          const id = data.replace('confirmpreview_', '');
+
+          const text = store.get(`pending_edit_text_${id}`);
+
+          await processFormSubmit({ confession: text }, id);
+
+          const tgMsgId = store.get(`telegram_msg_${id}`);
+
+          await updateTelegramButtons(chatId, tgMsgId, 'default', id);
+
+          await answerCallback(cbId, 'Confirmed ✅');
         } else if (data.startsWith('reject_')) {
           const id = data.replace('reject_', '');
 
@@ -172,7 +195,7 @@ function startTelegramPoller() {
 
   pollLoop();
 }
-//mai ye bol raha tha
+
 module.exports = {
   startTelegramPoller,
 };
