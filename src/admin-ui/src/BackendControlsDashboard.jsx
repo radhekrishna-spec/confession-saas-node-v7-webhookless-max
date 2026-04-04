@@ -13,6 +13,39 @@ import {
   Palette,
 } from 'lucide-react';
 
+function ConfessionNoControl() {
+  const [number, setNumber] = useState('');
+
+  const updateNumber = async () => {
+    await fetch(`${API_BASE}/api/confession-no`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        confessionNo: number,
+      }),
+    });
+
+    alert('Confession number updated');
+  };
+
+  return (
+    <div style={{ marginTop: '20px' }}>
+      <h3>Set Confession Number</h3>
+
+      <input
+        type="number"
+        value={number}
+        onChange={(e) => setNumber(e.target.value)}
+        placeholder="Enter number"
+      />
+
+      <button onClick={updateNumber}>Update</button>
+    </div>
+  );
+}
+
 const API_BASE = import.meta.env.DEV
   ? 'http://localhost:3000'
   : 'https://confession-saas-node-v7-webhookless-max.onrender.com';
@@ -307,6 +340,7 @@ export default function BackendControlsDashboard() {
                 Change Accent Theme
               </button>
             </div>
+            <ConfessionNoControl />
           </div>
         </div>
       </div>
