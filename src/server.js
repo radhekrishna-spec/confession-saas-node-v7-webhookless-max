@@ -10,7 +10,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
-
+const { startTelegramPoller } = require('./telegramBot');
 const submitRoutes = require('./routes/submitRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 
@@ -47,8 +47,9 @@ async function startServer() {
     //startWorkersSafely();
   });
 }
-startTelegramPoller();
+//startTelegramPoller();
 startServer();
+startWorkersSafely();
 
 app.use(express.json());
 
