@@ -9,17 +9,26 @@ async function postCarousel(images, caption) {
 
   // STEP 1 child media
   for (const url of images) {
-    const res = await axios.post(
-      `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
-      null,
-      {
-        params: {
-          image_url: url,
-          is_carousel_item: true,
-          access_token: ACCESS_TOKEN,
+    console.log('INSTAGRAM URL RECEIVED:', url);
+
+    let res;
+
+    try {
+      res = await axios.post(
+        `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
+        null,
+        {
+          params: {
+            image_url: url,
+            is_carousel_item: true,
+            access_token: ACCESS_TOKEN,
+          },
         },
-      },
-    );
+      );
+    } catch (error) {
+      console.error('IG API ERROR:', error.response?.data || error.message);
+      throw error;
+    }
 
     const id = res.data.id;
 

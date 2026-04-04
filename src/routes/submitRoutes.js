@@ -157,6 +157,9 @@ router.post('/post-now', async (req, res) => {
 
     const caption = confession?.message || `Confession #${id}`;
 
+    console.log('DEBUG FILE ID:', fileId);
+    console.log('DEBUG IMAGE URL:', imageUrl);
+    console.log('DEBUG CAPTION:', caption);
     // POST TO INSTAGRAM
     await postCarousel([imageUrl], caption);
 
