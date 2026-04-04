@@ -183,20 +183,13 @@ async function pollTelegramUpdates() {
 function startTelegramPoller() {
   console.log('Telegram poller started...');
 
-  async function pollLoop() {
-    while (true) {
-      try {
-        await pollTelegramUpdates();
-      } catch (error) {
-        console.error('POLL LOOP ERROR:', error.message);
-      }
-
-      // small delay to avoid timeout spam
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+  setInterval(async () => {
+    try {
+      await pollTelegramUpdates();
+    } catch (error) {
+      console.error('POLL LOOP ERROR:', error.message);
     }
-  }
-
-  pollLoop();
+  }, 3000);
 }
 
 module.exports = {
