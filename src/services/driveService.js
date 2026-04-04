@@ -3,6 +3,10 @@ const { Readable } = require('stream');
 const store = require('../store');
 
 const ROOT_FOLDER_ID = process.env.ROOT_FOLDER_ID;
+const QUEUE_FOLDER_ID = process.env.QUEUE_FOLDER_ID;
+const POSTED_FOLDER_ID = process.env.POSTED_FOLDER_ID;
+const REJECTED_FOLDER_ID = process.env.REJECTED_FOLDER_ID;
+const EDIT_ARCHIVE_FOLDER_ID = process.env.EDIT_ARCHIVE_FOLDER_ID;
 
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
@@ -24,8 +28,22 @@ function getDriveDirectImageUrl(fileId) {
   return `https://drive.google.com/uc?export=view&id=${fileId}`;
 }
 
-async function uploadImagesToDrive(imageBuffers, confessionNo) {
+async function uploadImagesToDrive(
+  imageBuffers,
+  confessionNo,
+  folderType = 'queue',
+) {
   const drive = getDriveClient();
+
+  const folderMap = {
+    root: ROOT_FOLDER_ID,
+    queue: QUEUE_FOLDER_ID,
+    posted: POSTED_FOLDER_ID,
+    rejected: REJECTED_FOLDER_ID,
+    edited: EDIT_ARCHIVE_FOLDER_ID,
+  };
+
+  const folderId = folderMap[folderType] || QUEUE_FOLDER_ID;
 
   let storedImages = [];
   let ids = store.get(`fileIds_${confessionNo}`) || [];
@@ -41,7 +59,7 @@ async function uploadImagesToDrive(imageBuffers, confessionNo) {
     const res = await drive.files.create({
       requestBody: {
         name: imgName,
-        parents: [ROOT_FOLDER_ID],
+        parents: [folderId],
       },
       media: {
         mimeType: 'image/png',
@@ -53,7 +71,6 @@ async function uploadImagesToDrive(imageBuffers, confessionNo) {
     const fileId = res.data.id;
 
     ids.push(fileId);
-
     storedImages.push(getDriveDirectImageUrl(fileId));
   }
 
@@ -62,7 +79,38 @@ async function uploadImagesToDrive(imageBuffers, confessionNo) {
   return storedImages;
 }
 
+async function moveFileToFolder(fileId, folderType) {
+  const drive = getDriveClient();
+
+  const folderMap = {
+    root: ROOT_FOLDER_ID,
+    queue: QUEUE_FOLDER_ID,
+    posted: POSTED_FOLDER_ID,
+    rejected: REJECTED_FOLDER_ID,
+    edited: EDIT_ARCHIVE_FOLDER_ID,
+  };
+
+  const targetFolderId = folderMap[folderType];
+
+  const file = await drive.files.get({
+    fileId,
+    fields: 'parents',
+  });
+
+  const previousParents = file.data.parents.join(',');
+
+  await drive.files.update({
+    fileId,
+    addParents: targetFolderId,
+    removeParents: previousParents,
+    fields: 'id, parents',
+  });
+
+  console.log(`✅ File moved to ${folderType}`);
+}
+
 module.exports = {
   uploadImagesToDrive,
+  moveFileToFolder,
   getDriveDirectImageUrl,
 };
