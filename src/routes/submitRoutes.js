@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-
-const store = require('../store');
+const Confession = require('../models/Confession');
+const Counter = require('../models/Counter');
 const { processFormSubmit } = require('../services/formSubmitService');
-
+const store = require('../store');
+const { moveFileToFolder } = require('../services/googleDriveService');
 
 function getPostTimes(queueCount) {
   if (queueCount <= 3) return [9, 13, 21];
@@ -20,7 +21,6 @@ function getEstimatedPostTime(queueAhead) {
 
   const slots = getPostTimes(Math.max(queueAhead + 1, 1));
 
-  // current hour ka slot agar 5 min se nikal gaya to next slots only
   const nextSlots = slots.filter((hour) => {
     if (hour > currentHour) return true;
     if (hour === currentHour && currentMinute <= 5) return true;
@@ -36,87 +36,107 @@ function getEstimatedPostTime(queueAhead) {
   }
 
   const suffix = selectedHour >= 12 ? 'PM' : 'AM';
+  const hour12 = selectedHour > 12 ? selectedHour - 12 : selectedHour;
 
-  const hour12 =
-    selectedHour === 0
-      ? 12
-      : selectedHour > 12
-        ? selectedHour - 12
-        : selectedHour;
-
-  return `${hour12}:00 ${suffix}`;
+  return `Around ${hour12}:00 ${suffix}`;
 }
-// health test route
-router.get('/test', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Submit routes working',
-  });
-});
 
-// main submit route
+// submit route
 router.post('/submit', async (req, res) => {
   try {
-    const { confession } = req.body;
+    const { message } = req.body;
 
-    // validation
-    if (!confession || !confession.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Confession text is required',
-      });
-    }
+    console.log('STEP 1 request received');
 
-    const cleanText = confession.trim();
+    const counter = await Counter.findOneAndUpdate(
+      { key: 'confessionNumber' },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true },
+    );
 
-    // duplicate protection (last 10 sec same text block)
-    const lastText = store.get('LAST_SUBMIT_TEXT');
-    const lastTime = store.get('LAST_SUBMIT_TIME');
+    const confessionNo = counter.seq;
 
-    if (lastText === cleanText && lastTime && Date.now() - lastTime < 10000) {
-      return res.status(409).json({
-        success: false,
-        error: 'Duplicate submission detected',
-      });
-    }
+    const newConfession = new Confession({
+      message,
+      confessionNo,
+      status: 'pending',
+    });
 
-    store.set('LAST_SUBMIT_TEXT', cleanText);
-    store.set('LAST_SUBMIT_TIME', Date.now());
+    await newConfession.save();
+    console.log('STEP 2 mongo saved');
 
-    // exact same original flow
-    const allBefore = store.getAll() || {};
+    await processFormSubmit({
+      confession: message,
+    });
 
-    let queueAhead = 0;
+    console.log('STEP 3 process done');
 
-    for (const key in allBefore) {
-      if (
-        key.startsWith('state_') &&
-        ['CREATED', 'APPROVED', 'POSTING'].includes(allBefore[key])
-      ) {
-        queueAhead++;
-      }
-    }
-
-    const result = await processFormSubmit({
-      confession: cleanText,
+    const queueAhead = await Confession.countDocuments({
+      status: 'pending',
+      confessionNo: { $lt: confessionNo },
     });
 
     const eta = getEstimatedPostTime(queueAhead);
 
-    return res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: 'Confession submitted successfully',
-      confessionNo: result?.confessionNo || null,
+      confessionNo,
       queueAhead,
       eta,
-      result: result || null,
+      data: newConfession,
     });
   } catch (error) {
-    console.error('SUBMIT ROUTE ERROR:', error);
+    console.error('ROUTE ERROR:', error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// immediate post route
+router.post('/post-now', async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'id is required',
+      });
+    }
+
+    const fileIds = store.get(`fileIds_${id}`) || [];
+
+    if (!fileIds.length) {
+      return res.status(404).json({
+        success: false,
+        error: `No queue image found for confession #${id}`,
+      });
+    }
+
+    for (const fileId of fileIds) {
+      await moveFileToFolder(fileId, 'posted');
+    }
+
+    await Confession.findOneAndUpdate(
+      { confessionNo: id },
+      { status: 'posted' },
+    );
+
+    store.set(`state_${id}`, 'POSTED');
+
+    return res.status(200).json({
+      success: true,
+      message: `Confession #${id} posted successfully`,
+    });
+  } catch (error) {
+    console.error('POST NOW ERROR:', error);
 
     return res.status(500).json({
       success: false,
-      error: error.message || 'Submission failed',
+      error: error.message,
     });
   }
 });
