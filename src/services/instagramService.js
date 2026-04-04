@@ -3,32 +3,56 @@ const axios = require('axios');
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 const IG_USER_ID = process.env.IG_USER_ID;
 
-// EXACT SAME APPSCRIPT
+async function postSingleImage(imageUrl, caption) {
+  const container = await axios.post(
+    `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
+    null,
+    {
+      params: {
+        image_url: imageUrl,
+        caption,
+        access_token: ACCESS_TOKEN,
+      },
+    },
+  );
+
+  const creationId = container.data.id;
+
+  if (!creationId) {
+    throw new Error('Single image container create failed');
+  }
+
+  await axios.post(
+    `https://graph.facebook.com/v19.0/${IG_USER_ID}/media_publish`,
+    null,
+    {
+      params: {
+        creation_id: creationId,
+        access_token: ACCESS_TOKEN,
+      },
+    },
+  );
+
+  return true;
+}
+
 async function postCarousel(images, caption) {
   const children = [];
 
-  // STEP 1 child media
   for (const url of images) {
     console.log('INSTAGRAM URL RECEIVED:', url);
 
-    let res;
-
-    try {
-      res = await axios.post(
-        `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
-        null,
-        {
-          params: {
-            image_url: url,
-            is_carousel_item: true,
-            access_token: ACCESS_TOKEN,
-          },
+    const res = await axios.post(
+      `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
+      null,
+      {
+        params: {
+          image_url: url,
+          is_carousel_item: true,
+          access_token: ACCESS_TOKEN,
         },
-      );
-    } catch (error) {
-      console.error('IG API ERROR:', error.response?.data || error.message);
-      throw error;
-    }
+      },
+    );
 
     const id = res.data.id;
 
@@ -39,10 +63,8 @@ async function postCarousel(images, caption) {
     children.push(id);
   }
 
-  // SAME WAIT
   await new Promise((r) => setTimeout(r, 15000));
 
-  // STEP 2 carousel
   const carousel = await axios.post(
     `https://graph.facebook.com/v19.0/${IG_USER_ID}/media`,
     null,
@@ -62,7 +84,6 @@ async function postCarousel(images, caption) {
     throw new Error('Carousel create failed');
   }
 
-  // STEP 3 publish
   await axios.post(
     `https://graph.facebook.com/v19.0/${IG_USER_ID}/media_publish`,
     null,
@@ -77,6 +98,21 @@ async function postCarousel(images, caption) {
   return true;
 }
 
+// AUTO DECISION FUNCTION
+async function postToInstagram(images, caption) {
+  if (!images || !images.length) {
+    throw new Error('No images provided');
+  }
+
+  if (images.length === 1) {
+    return await postSingleImage(images[0], caption);
+  }
+
+  return await postCarousel(images, caption);
+}
+
 module.exports = {
+  postSingleImage,
   postCarousel,
+  postToInstagram,
 };

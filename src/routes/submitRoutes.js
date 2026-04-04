@@ -6,7 +6,7 @@ const { processFormSubmit } = require('../services/formSubmitService');
 const store = require('../store');
 const { moveFileToFolder } = require('../services/driveService');
 const { google } = require('googleapis');
-const { postCarousel } = require('../services/instagramService');
+const { postToInstagram } = require('../services/instagramService');
 
 function getPostTimes(queueCount) {
   if (queueCount <= 3) return [9, 13, 21];
@@ -148,7 +148,7 @@ router.post('/post-now', async (req, res) => {
     });
 
     // drive direct image url
-    const imageUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`;
+    const imageUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
 
     // caption
     const confession = await Confession.findOne({
@@ -161,7 +161,7 @@ router.post('/post-now', async (req, res) => {
     console.log('DEBUG IMAGE URL:', imageUrl);
     console.log('DEBUG CAPTION:', caption);
     // POST TO INSTAGRAM
-    await postCarousel([imageUrl], caption);
+    await postToInstagram([imageUrl], caption);
 
     // MOVE TO POSTED AFTER SUCCESS
     await moveFileToFolder(fileId, 'posted');
