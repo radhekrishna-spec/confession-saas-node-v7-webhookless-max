@@ -139,8 +139,16 @@ router.post('/post-now', async (req, res) => {
 
     const fileId = searchRes.data.files[0].id;
 
+    await drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
     // drive direct image url
-    const imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    const imageUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`;
 
     // caption
     const confession = await Confession.findOne({
