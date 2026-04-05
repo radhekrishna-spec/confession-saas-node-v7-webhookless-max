@@ -15,9 +15,10 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const submitRoutes = require('./routes/submitRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 
-
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const { startWorkers } = require('./workers/index');
 
 // logs folder
 const logsDir = path.join(__dirname, '../logs');
@@ -34,10 +35,8 @@ app.use(cors());
 app.use(helmet());
 app.use(compression());
 
-
 app.use(morgan('combined', { stream: accessLogStream }));
 app.use(morgan('dev'));
-
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -63,16 +62,15 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on ${PORT}`);
-    startWorkersSafely();
+   
+    setTimeout(() => {
+      startWorkers();
+      console.log('✅ All workers started');
+    }, 10000);
   });
 }
 
 startServer();
-
-
-
-
-
 
 // error handler
 app.use((err, req, res, next) => {
@@ -85,26 +83,6 @@ app.use((err, req, res, next) => {
 });
 
 // SAFE WORKER STARTUP
-function startWorkersSafely() {
-  try {
-    const { startTelegramPoller } = require('./workers/telegramPoller');
-
-    const { startSchedulerWorker } = require('./workers/schedulerWorker');
-
-    const { startRecoveryWorker } = require('./workers/recoveryWorker');
-
-    const { startEditQueueWorker } = require('./modules/confession//workers/editQueueWorker');
-
-    startTelegramPoller();
-    startSchedulerWorker();
-    startRecoveryWorker();
-    startEditQueueWorker();
-
-    console.log('✅ All workers started');
-  } catch (error) {
-    console.error('WORKER STARTUP ERROR:', error.message);
-  }
-}
 
 // process level errors
 process.on('uncaughtException', (err) => {
