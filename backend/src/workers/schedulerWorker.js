@@ -109,7 +109,7 @@ async function processApprovedQueue() {
     };
   }
 
-  if (!images.length) {
+  if (!images.length) {if (!images.length) {
     await Confession.updateOne(
       { confessionNo },
       {
@@ -117,6 +117,10 @@ async function processApprovedQueue() {
         failureReason: 'No images found',
       },
     );
+
+    store.set(`state_${confessionNo}`, 'FAILED');
+
+    console.log(`❌ #${confessionNo} marked FAILED`);
 
     return {
       success: false,

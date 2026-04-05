@@ -72,12 +72,12 @@ async function pollTelegramUpdates() {
     const updates = res.data?.result || [];
 
     for (const update of updates) {
-     // console.log('📩 FULL UPDATE:', JSON.stringify(update, null, 2));
+      // console.log('📩 FULL UPDATE:', JSON.stringify(update, null, 2));
 
       if (update.callback_query) {
-       // console.log('🟢 CALLBACK RECEIVED');
-       // console.log('🟢 DATA:', update.callback_query.data);
-       // console.log('🟢 CHAT ID:', update.callback_query.message?.chat?.id);
+        // console.log('🟢 CALLBACK RECEIVED');
+        // console.log('🟢 DATA:', update.callback_query.data);
+        // console.log('🟢 CHAT ID:', update.callback_query.message?.chat?.id);
         //console.log('🟢 MSG ID:', update.callback_query.message?.message_id);
       }
       lastUpdateId = update.update_id;
@@ -190,8 +190,8 @@ async function pollTelegramUpdates() {
     console.error('POLL ERROR:', err);
 
     if (error.response?.data?.error_code === 409) {
-      //console.log('⚠️ Conflict detected, waiting before retry...');
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      console.log('⚠️ 409 conflict, retrying after 15 sec...');
+      await new Promise((resolve) => setTimeout(resolve, 15000));
       return;
     }
   } finally {
@@ -201,19 +201,33 @@ async function pollTelegramUpdates() {
 
 let pollerStarted = false;
 
-
 function startTelegramPoller() {
-  //console.log('🚀 startTelegramPoller called at:', new Date().toISOString());
   console.trace('📍 POLLER START TRACE');
 
   if (pollerStarted) {
-    //console.log('⚠️ Poller already started');
     return;
   }
 
   pollerStarted = true;
 
-  //console.log('✅ Telegram poller actually started');
+  // ✅ clear old pending telegram updates once
+  axios
+    .get(`${BASE_URL}/getUpdates`, {
+      params: {
+        offset: -1,
+        timeout: 1,
+      },
+      timeout: 5000,
+    })
+    .then(() => {
+      console.log('🧹 Old Telegram updates cleared');
+    })
+    .catch((err) => {
+      console.error(
+        '❌ Update clear error:',
+        err.response?.data || err.message,
+      );
+    });
 
   const pollLoop = async () => {
     try {

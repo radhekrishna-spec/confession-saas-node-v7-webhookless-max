@@ -11,6 +11,10 @@ exports.createConfession = async ({ message }) => {
     confession: message,
   });
 
+  console.log('🧪 SUBMIT RESULT:', result);
+  console.log('🖼️ IMAGES:', result.images);
+  console.log('📏 COUNT:', result.images?.length);
+
   const confessionNo = result.confessionNo;
 
   const newConfession = await Confession.create({
