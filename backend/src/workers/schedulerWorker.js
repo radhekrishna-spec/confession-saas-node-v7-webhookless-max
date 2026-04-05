@@ -148,15 +148,18 @@ async function processApprovedQueue() {
       message: `Confession #${confessionNo} posted successfully`,
     };
   } catch (error) {
-    console.error('POST FAIL', error.message);
-    store.set(`state_${confessionNo}`, 'FAILED');
+    console.error('❌ POST FAIL FULL:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
 
-   
+    store.set(`state_${confessionNo}`, 'FAILED');
 
     return {
       success: false,
       confessionNo,
-      message: error.message,
+      message: error.response?.data || error.message,
     };
   } finally {
     store.delete(`posting_${confessionNo}`);
