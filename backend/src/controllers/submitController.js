@@ -37,19 +37,10 @@ exports.postConfessionNow = async (req, res) => {
     console.log('✅ Temporary approved states set for queue images');
     //console.log('🚀 Manual post-now request received');
 
-    const approvedKeys = Object.keys(store.store || {})
-      .filter((key) => key.startsWith('state_'))
-      .filter((key) => store.get(key) === 'APPROVED');
-
-    console.log('📋 Approved keys found:', approvedKeys);
-
-    if (!approvedKeys.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'No approved confession found in queue',
-      });
-    }
-
+    console.log('📦 Checking manually injected approved states...');
+    console.log('state_17 =', store.get('state_17'));
+    console.log('state_21 =', store.get('state_21'));
+    console.log('state_41 =', store.get('state_41'));
     const result = await processApprovedQueue();
 
     console.log('📤 processApprovedQueue result:', result);
