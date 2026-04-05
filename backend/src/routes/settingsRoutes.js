@@ -20,9 +20,16 @@ router.post('/settings', (req, res) => {
     settings: updated,
   });
 });
+router.get('/confession-no', async (req, res) => {
+  const current = await getCurrentConfessionNo();
 
+  res.json({
+    success: true,
+    confessionNo: current,
+  });
+});
 // NEW
-router.post('/confession-no', (req, res) => {
+router.post('/confession-no', async (req, res) => {
   const { confessionNo } = req.body;
 
   if (!confessionNo) {
@@ -32,7 +39,7 @@ router.post('/confession-no', (req, res) => {
     });
   }
 
-  const updated = setConfessionNo(confessionNo);
+  const updated = await setConfessionNo(confessionNo);
 
   res.json({
     success: true,
