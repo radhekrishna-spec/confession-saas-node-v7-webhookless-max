@@ -5,6 +5,7 @@ const { sendTelegramMessage } = require('../modules/social/telegramService');
 //const { processFormSubmit } = require('./formSubmitService');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const Confession = require('../models/Confession');
 
 const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -176,6 +177,11 @@ async function approveConfession(chatId, messageId, confessionNo) {
   store.set(`state_${confessionNo}`, 'APPROVED');
   store.set(`approved_time_${confessionNo}`, Date.now());
 
+  await Confession.updateOne(
+    { confessionNo: Number(confessionNo) },
+    { status: 'APPROVED' },
+  );
+
   await updateTelegramButtons(chatId, messageId, 'approved', confessionNo);
 
   await sendTelegramMessage(chatId, `✅ Confession #${confessionNo} approved`);
@@ -191,6 +197,11 @@ async function rejectConfession(chatId, messageId, confessionNo) {
   store.set(`status_${confessionNo}`, 'rejected');
   store.set(`state_${confessionNo}`, 'REJECTED');
   store.set(`rejected_time_${confessionNo}`, Date.now());
+
+  await Confession.updateOne(
+  { confessionNo: Number(confessionNo) },
+  { status: 'REJECTED' }
+);
 
   await updateTelegramButtons(chatId, messageId, 'rejected', confessionNo);
 

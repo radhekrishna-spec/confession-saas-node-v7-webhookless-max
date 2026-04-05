@@ -24,35 +24,19 @@ async function sendTelegram(images, caption, confessionNo, isEdit = false) {
 
     try {
       for (let i = 0; i < images.length; i += chunkSize) {
-        const imgUrl = images[i];
+        const imageBuffer = images[i];
+        console.log('📦 TELEGRAM BUFFER SIZE:', imageBuffer.length);
+        console.log('🧪 PNG SIGNATURE:', imageBuffer.slice(0, 8));
 
-        console.log('📤 Downloading image for Telegram:', imgUrl);
-        const imageRes = await axios.get(imgUrl, {
-          responseType: 'arraybuffer',
-          timeout: 20000,
-          headers: {
-            Accept: 'image/png,image/*,*/*',
-            'User-Agent': 'Mozilla/5.0',
-          },
-          maxRedirects: 5,
-        });
-
-        const contentType = imageRes.headers['content-type'];
-
-        console.log('🧪 IMAGE CONTENT TYPE:', contentType);
-
-        if (!contentType || !contentType.includes('image')) {
-          throw new Error('Downloaded file is not an image');
-        }
+        console.log(`📤 Sending image buffer ${i + 1} for Telegram`);
 
         const form = new FormData();
 
         form.append('chat_id', CHAT_ID);
-        form.append(
-          'photo',
-          Buffer.from(imageRes.data),
-          `confession_${confessionNo}.png`,
-        );
+        form.append('photo', imageBuffer, {
+          filename: `confession_${confessionNo}_${i + 1}.png`,
+          contentType: 'image/png',
+        });
 
         if (i === 0) {
           form.append('caption', caption);

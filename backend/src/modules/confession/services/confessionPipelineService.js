@@ -37,7 +37,8 @@ async function processMediaFlow(text, existingConfessionNo, settings) {
 
   return {
     confessionNo,
-    images: driveUrls,
+    images: driveUrls, // DB + queue flow same
+    telegramImages: imageBuffers, // direct telegram preview
   };
 }
 

@@ -88,9 +88,9 @@ async function processApprovedQueue() {
       message: 'No approved confession',
     };
   }
-
-  const images = store.get(`images_${confessionNo}`) || [];
-  const caption = store.get(`caption_${confessionNo}`) || '';
+  const confessionNo = confession.confessionNo;
+  const images = confession.images || [];
+  const caption = confession.caption || '';
 
   console.log('🖼 images:', images);
   console.log('📝 caption:', caption);
@@ -113,6 +113,24 @@ async function processApprovedQueue() {
   try {
     store.set(`posting_${confessionNo}`, '1');
     await Confession.updateOne({ confessionNo }, { status: 'POSTING' });
+    console.log('📤 INSTAGRAM IMAGE URL:', images[0]);
+    console.log('📝 INSTAGRAM CAPTION:', caption);
+
+    const axios = require('axios');
+
+    try {
+      const testRes = await axios.get(images[0], {
+        responseType: 'arraybuffer',
+        timeout: 15000,
+        maxRedirects: 5,
+      });
+
+      console.log('🧪 IMAGE FETCH STATUS:', testRes.status);
+      console.log('🧪 IMAGE CONTENT TYPE:', testRes.headers['content-type']);
+      console.log('🧪 IMAGE SIZE:', testRes.data.length);
+    } catch (e) {
+      console.error('❌ IMAGE URL TEST FAIL:', e.response?.data || e.message);
+    }
 
     await postToInstagram(images, caption);
     await Confession.updateOne(

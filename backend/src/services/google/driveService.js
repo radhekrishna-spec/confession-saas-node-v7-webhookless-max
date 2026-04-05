@@ -25,7 +25,7 @@ function getDriveClient() {
 }
 
 function getDriveDirectImageUrl(fileId) {
-  return `https://docs.google.com/presentation/d/${fileId}/export/png`;
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 async function uploadImagesToDrive(
@@ -69,6 +69,14 @@ async function uploadImagesToDrive(
     });
 
     const fileId = res.data.id;
+
+    await drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
 
     ids.push(fileId);
     storedImages.push(getDriveDirectImageUrl(fileId));

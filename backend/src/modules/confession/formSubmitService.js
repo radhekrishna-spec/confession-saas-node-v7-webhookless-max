@@ -31,7 +31,7 @@ async function processFormSubmit(data, existingConfessionNo = null) {
       try {
         await new Promise((resolve) => setTimeout(resolve, 8000));
         await sendTelegram(
-          mediaResult.images,
+          mediaResult.telegramImages,
           caption,
           mediaResult.confessionNo,
           !!existingConfessionNo,
