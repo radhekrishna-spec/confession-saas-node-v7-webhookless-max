@@ -185,6 +185,9 @@ async function pollTelegramUpdates() {
 let pollerStarted = false;
 
 function startTelegramPoller() {
+  console.log('🚀 startTelegramPoller called at:', new Date().toISOString());
+  console.trace('📍 POLLER START TRACE');
+
   if (pollerStarted) {
     console.log('⚠️ Poller already started');
     return;
@@ -192,9 +195,12 @@ function startTelegramPoller() {
 
   pollerStarted = true;
 
-  console.log('Telegram poller started...');
+  console.log('✅ Telegram poller actually started');
 
   const pollLoop = async () => {
+    pollLoopCount++;
+    console.log(`🔄 Poll loop running #${pollLoopCount}`);
+
     try {
       await pollTelegramUpdates();
     } catch (error) {
