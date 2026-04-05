@@ -37,8 +37,11 @@ async function shouldPostNow() {
   const currentMinute = now.getMinutes();
 
   // only trigger in first 5 mins
-  if (currentMinute > 59) {
-    return false;
+  // if (currentMinute > 59) {
+  //   return false;
+  // }
+  if (currentMinute % 2 === 0) {
+    return true;
   }
 
   const queueCount = await getApprovedQueueCount();
