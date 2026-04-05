@@ -109,7 +109,7 @@ async function processApprovedQueue() {
     };
   }
 
-  if (!images.length) {if (!images.length) {
+  if (!images.length) {
     await Confession.updateOne(
       { confessionNo },
       {
