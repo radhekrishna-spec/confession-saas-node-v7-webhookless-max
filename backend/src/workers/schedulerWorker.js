@@ -110,7 +110,14 @@ async function processApprovedQueue() {
   }
 
   if (!images.length) {
-    store.set(`state_${confessionNo}`, 'FAILED');
+    await Confession.updateOne(
+      { confessionNo },
+      {
+        status: 'FAILED',
+        failureReason: 'No images found',
+      },
+    );
+
     return {
       success: false,
       message: 'No images found',
