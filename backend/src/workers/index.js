@@ -1,6 +1,8 @@
 const { startTelegramPoller } = require('./telegramPoller');
 
-const { startEditQueueWorker } = require('./editQueueWorker');
+const {
+  startEditQueueWorker,
+} = require('../modules/confession/workers/editQueueWorker');
 
 const { startSchedulerWorker } = require('./schedulerWorker');
 
