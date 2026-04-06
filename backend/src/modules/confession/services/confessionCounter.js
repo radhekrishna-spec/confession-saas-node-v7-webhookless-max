@@ -5,23 +5,18 @@ const DEFAULT_CONFESSION_NO = 1000;
 async function getNextConfessionNo() {
   const counter = await Counter.findOneAndUpdate(
     { key: 'confessionNumber' },
-    { $inc: { seq: 1 } },
+    {
+      $inc: { seq: 1 },
+      $setOnInsert: { seq: 217 },
+    },
     {
       upsert: true,
-      returnDocument: 'after',
+      new: true,
     },
   );
 
-  // first time initialize
-  if (!counter.seq || counter.seq === 1) {
-    counter.seq = DEFAULT_CONFESSION_NO;
-    await counter.save();
-    return DEFAULT_CONFESSION_NO;
-  }
-
   return counter.seq;
 }
-
 async function setConfessionNo(newNo) {
   await Counter.findOneAndUpdate(
     { key: 'confessionNumber' },

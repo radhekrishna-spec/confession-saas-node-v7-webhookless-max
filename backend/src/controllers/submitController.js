@@ -3,6 +3,7 @@ const { processApprovedQueue } = require('../workers/schedulerWorker');
 const store = require('../store/store');
 
 exports.submitConfession = async (req, res) => {
+  console.log('🟢 SUBMIT API HIT:', new Date().toISOString());
   try {
     // console.log('📝 New confession submit request received');
     // console.log('📦 Request body:', req.body);
