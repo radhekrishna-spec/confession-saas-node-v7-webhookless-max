@@ -71,7 +71,7 @@ async function shouldPostNow() {
   //   return true;
   // }
 
-  if (currentMinute % 5 !== 0) {
+  if (currentMinute % 2 !== 0) {
     return false;
   }
 
