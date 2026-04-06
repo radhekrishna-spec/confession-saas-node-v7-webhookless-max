@@ -128,7 +128,7 @@ async function pollTelegramUpdates() {
         if (data.startsWith('approve_')) {
           const id = data.replace('approve_', '');
 
-          await approveConfession(chatId, messageId, id);
+          await approveConfession(chatId, messageId, Number(id));
 
           await answerCallback(cbId, 'Approved ✅');
         } else if (data.startsWith('stopedit_')) {
@@ -157,7 +157,7 @@ async function pollTelegramUpdates() {
 
           const text = store.get(`pending_edit_text_${id}`);
 
-          await processFormSubmit({ confession: text }, id);
+          await processFormSubmit({ confession: text }, Number(id));
 
           const tgMsgId = store.get(`telegram_msg_${id}`);
 
@@ -167,13 +167,13 @@ async function pollTelegramUpdates() {
         } else if (data.startsWith('reject_')) {
           const id = data.replace('reject_', '');
 
-          await rejectConfession(chatId, messageId, id);
+          await rejectConfession(chatId, messageId, Number(id));
 
           await answerCallback(cbId, 'Rejected ❌');
         } else if (data.startsWith('edit_')) {
           const id = data.replace('edit_', '');
 
-          await startEditMode(chatId, messageId, id);
+          await startEditMode(chatId, messageId, Number(id));
 
           await answerCallback(cbId, 'Edit mode ✏️');
         } else if (data.startsWith('more_')) {
@@ -191,8 +191,7 @@ async function pollTelegramUpdates() {
     console.error('POLL ERROR:', err);
 
     if (error.response?.data?.error_code === 409) {
-      console.log('⚠️ 409 conflict, retrying after 15 sec...');
-      await new Promise((resolve) => setTimeout(resolve, 15000));
+      console.log('⚠️ 409 conflict, waiting...');
       return;
     }
   } finally {
@@ -211,34 +210,17 @@ function startTelegramPoller() {
 
   pollerStarted = true;
 
-  // ✅ clear old pending telegram updates once
-  axios
-    .get(`${BASE_URL}/getUpdates`, {
-      params: {
-        offset: -1,
-        timeout: 1,
-      },
-      timeout: 5000,
-    })
-    .then(() => {
-      console.log('🧹 Old Telegram updates cleared');
-    })
-    .catch((err) => {
-      console.error(
-        '❌ Update clear error:',
-        err.response?.data || err.message,
-      );
-    });
+  async function pollLoop() {
+    while (true) {
+      try {
+        await pollTelegramUpdates();
+      } catch (error) {
+        console.error('POLL LOOP ERROR:', error.message);
+      }
 
-  const pollLoop = async () => {
-    try {
-      await pollTelegramUpdates();
-    } catch (error) {
-      console.error('POLL LOOP ERROR:', error.message);
-    } finally {
-      setTimeout(pollLoop, 3000);
+      await new Promise((r) => setTimeout(r, 1000));
     }
-  };
+  }
 
   pollLoop();
 }
