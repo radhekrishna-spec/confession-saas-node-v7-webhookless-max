@@ -53,9 +53,9 @@ async function shouldPostNow() {
   const postTimes = getPostTimes(queueCount);
 
   // current hour allowed hai ya nahi
-  if (!postTimes.includes(currentHour)) {
-    return false;
-  }
+  // if (!postTimes.includes(currentHour)) {
+  //   return false;
+  // }
 
   // const todayKey = now.toDateString();
   //   const slotKey = `LAST_POST_SLOT_${todayKey}_${currentHour}`;
