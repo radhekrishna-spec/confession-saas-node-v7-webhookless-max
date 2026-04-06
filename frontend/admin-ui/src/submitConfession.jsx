@@ -41,28 +41,26 @@ export default function SubmitConfession() {
   };
 
   return (
-    <div className=" bg-[#050816] flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-2xl p-6">
-        <h2 className="text-white text-xl font-semibold mb-4">
-          Anonymous Confession 🎭
-        </h2>
+    <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-5 shadow-xl">
+      <h3 className="font-semibold mb-4 text-white">
+        Write Your Confession 🎭
+      </h3>
 
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={6}
-          placeholder="Write your confession..."
-          className="w-full rounded-2xl bg-white/[0.03] border border-white/10 text-white p-4 outline-none resize-none"
-        />
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Write anonymously..."
+        rows={4}
+        className="w-full border border-white/10 bg-white/5 rounded-2xl p-3 text-white placeholder:text-gray-400 mb-3 outline-none resize-none"
+      />
 
-        <button
-          onClick={submitConfession}
-          disabled={loading}
-          className="w-full mt-4 rounded-2xl bg-white text-black font-semibold py-3 hover:scale-[1.02] transition-all"
-        >
-          {loading ? 'Submitting...' : 'Submit'}
-        </button>
-      </div>
+      <button
+        onClick={submitConfession}
+        disabled={loading}
+        className="w-full rounded-2xl bg-white text-black font-semibold p-3 hover:scale-[1.01] transition-all"
+      >
+        {loading ? 'Submitting...' : 'Submit'}
+      </button>
     </div>
   );
 }
