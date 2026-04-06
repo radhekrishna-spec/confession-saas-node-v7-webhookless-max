@@ -39,6 +39,7 @@ async function shouldPostNow() {
   );
 
   const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
 
   console.log('⏰ SCHEDULER CHECK RUNNING');
   console.log('🕒 CURRENT TIME:', now.toLocaleTimeString());
@@ -56,19 +57,27 @@ async function shouldPostNow() {
     return false;
   }
 
-  const todayKey = now.toDateString();
-  const slotKey = `LAST_POST_SLOT_${todayKey}_${currentHour}`;
+  // const todayKey = now.toDateString();
+  //   const slotKey = `LAST_POST_SLOT_${todayKey}_${currentHour}`;
 
-  // iss hour slot me already post ho chuki
-  if (store.get(slotKey)) {
+  //   // iss hour slot me already post ho chuki
+  //   if (store.get(slotKey)) {
+  //     return false;
+  //   }
+
+  //   // mark slot as used
+  //   store.set(slotKey, '1');
+
+  //   return true;
+  // }
+
+  if (currentMinute % 5 !== 0) {
     return false;
   }
 
-  // mark slot as used
-  store.set(slotKey, '1');
-
   return true;
 }
+
 // FIFO approved confession
 async function getNextApprovedConfession() {
   return await Confession.findOne({
