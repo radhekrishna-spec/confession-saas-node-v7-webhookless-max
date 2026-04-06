@@ -17,7 +17,7 @@ export default function SubmitConfession() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_BASE}/api/confessions/submit`, {
+      const res = await fetch(`${API_BASE}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
