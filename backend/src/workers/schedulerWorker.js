@@ -1,6 +1,6 @@
 const store = require('../store/store');
 const Confession = require('../models/Confession');
-
+const { moveFileToFolder } = require('../services//google/driveService');
 const { updateTelegramButtons } = require('../services/telegramUpdateService');
 const { postToInstagram } = require('../modules/social/instagramService');
 
@@ -156,6 +156,12 @@ async function processApprovedQueue() {
     }
 
     await postToInstagram(images, caption);
+
+    const fileIds = store.get(`fileIds_${confessionNo}`) || [];
+
+    for (const fileId of fileIds) {
+      await moveFileToFolder(fileId, 'posted');
+    }
     await Confession.updateOne(
       { confessionNo },
       {
