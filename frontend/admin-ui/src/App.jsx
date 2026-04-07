@@ -4,11 +4,10 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('adminToken');
+  const isAuth = localStorage.getItem('adminAuth');
 
-  return token ? children : <Navigate to="/admin/login" replace />;
+  return isAuth === 'true' ? children : <Navigate to="/admin/login" replace />;
 }
-
 export default function App() {
   return (
     <BrowserRouter>
